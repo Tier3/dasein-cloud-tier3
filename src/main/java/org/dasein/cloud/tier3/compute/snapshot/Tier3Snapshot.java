@@ -14,6 +14,7 @@ import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Snapshot;
+import org.dasein.cloud.compute.SnapshotCapabilities;
 import org.dasein.cloud.compute.SnapshotCreateOptions;
 import org.dasein.cloud.compute.SnapshotFilterOptions;
 import org.dasein.cloud.compute.SnapshotState;
@@ -147,13 +148,23 @@ public class Tier3Snapshot implements SnapshotSupport {
 	}
 
 	private String removeServerNameFromSnapshotId(String snapshotId, String serverName) {
-		snapshotId = snapshotId.replace(serverName + SNAPSHOT_ID_DELIMITER, "");
+		if (snapshotId == null || serverName == null) {
+			return null;
+		}
+		if (snapshotId.contains(SNAPSHOT_ID_DELIMITER)) {
+			return snapshotId.replace(serverName + SNAPSHOT_ID_DELIMITER, "");
+		}
 		return snapshotId;
 	}
 
 	private String extractServerNameFromSnapshotId(String snapshotId) {
-		String serverName = snapshotId.substring(0, snapshotId.indexOf(SNAPSHOT_ID_DELIMITER));
-		return serverName;
+		if (snapshotId == null) {
+			return null;
+		}
+		if (snapshotId.contains(SNAPSHOT_ID_DELIMITER)) {
+			return snapshotId.substring(0, snapshotId.indexOf(SNAPSHOT_ID_DELIMITER));
+		}
+		return snapshotId;
 	}
 
 	private @Nullable
@@ -221,12 +232,12 @@ public class Tier3Snapshot implements SnapshotSupport {
 	public Iterable<ResourceStatus> listSnapshotStatus() throws InternalException, CloudException {
 		// can't do a lookup of snapshots across the account - must be tied to a
 		// server
-		throw new OperationNotSupportedException();
+		return Collections.emptyList();
 	}
 
 	@Override
 	public Iterable<Snapshot> listSnapshots() throws InternalException, CloudException {
-		throw new OperationNotSupportedException();
+		return Collections.emptyList();
 	}
 
 	@Override
@@ -266,7 +277,7 @@ public class Tier3Snapshot implements SnapshotSupport {
 
 	@Override
 	public void remove(String snapshotId) throws InternalException, CloudException {
-		APITrace.begin(provider, "getSnapshot");
+		APITrace.begin(provider, "remove");
 		try {
 			if (snapshotId == null) {
 				throw new CloudException("SnapshotId is required");
@@ -368,5 +379,51 @@ public class Tier3Snapshot implements SnapshotSupport {
 	@Override
 	public void updateTags(String[] snapshotIds, Tag... tags) throws CloudException, InternalException {
 		throw new OperationNotSupportedException();
+	}
+
+	@Override
+	public SnapshotCapabilities getCapabilities() throws CloudException, InternalException {
+		return new SnapshotCapabilities() {
+            
+            @Override
+            public String getRegionId() {
+                return provider.getContext().getRegionId();
+            }
+            
+            @Override
+            public String getAccountNumber() {
+                return provider.getContext().getAccountNumber();
+            }
+            
+            @Override
+            public boolean supportsSnapshotSharingWithPublic() throws InternalException, CloudException {
+                return false;
+            }
+            
+            @Override
+            public boolean supportsSnapshotSharing() throws InternalException, CloudException {
+                return false;
+            }
+            
+            @Override
+            public boolean supportsSnapshotCreation() throws CloudException, InternalException {
+                return true;
+            }
+            
+            @Override
+            public boolean supportsSnapshotCopying() throws CloudException, InternalException {
+                return false;
+            }
+            
+            @Override
+            public Requirement identifyAttachmentRequirement() throws InternalException, CloudException {
+                return Requirement.REQUIRED;
+            }
+            
+            @Override
+            public String getProviderTermForSnapshot(Locale arg0) {
+                return "snapshot";
+            }
+        };
 	}
 }
